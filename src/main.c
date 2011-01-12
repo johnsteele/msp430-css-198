@@ -24,11 +24,34 @@
 //in cflags. #include	<msp430g2231.h> 
 #include	<io.h> /* Input/Output */
 
+
+
+
+
+// Toggles the LED. 
+void run_led (void);
+
+
 /*===========================================================================*/
 /*==================================[ main ]=================================*/
 /*===========================================================================*/
 int main (void)
 {
 
+	WDTCTL = WDTPW + WDTHOLD; // Stop watchdog timer. 
+	P1DIR |= 0x01;             // Set P1.0 to output direction. 
+
+	while (1) {
+		int i;
+		P1OUT ^= 0x01; // Toggle P1.0 using exclusive or. 
+		for (i = 0;i < 5000;i++);
+	}
+
 	return 0;
 } /* end main () */
+
+void run_led (void)
+{
+
+
+} /* end run_led () */
