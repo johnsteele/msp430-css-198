@@ -45,7 +45,7 @@
  *
  * - Peripheral-options are selected for a pin using the peripheral-option
  *   select registers. P1SEL and P2SEL. Because P1.1 is used as an output
- *   this pin mst be configured as an output using the port-1 direction
+ *   this pin must be configured as an output using the port-1 direction
  *   register (P1DIR). 
  *
  * - P2.2 is required to operate as an input. This is the default for an 
@@ -66,7 +66,7 @@
  *   indicates the beginning of the start-bit. When the UART function is 
  *   ready to receive data, no overhead is put on the CPU even though the 
  *   function is ready to receive a character at any time. CPU resources
- *   are only exercised aftera  start-bit falling edge occurs on P2.2. 
+ *   are only exercised after a  start-bit falling edge occurs on P2.2. 
  *   A falling edge on P2.2 captures the current value of the free running
  *   timer_A3 counter register (TAR) in CCR0 independent of any other run-
  *   time activity. Capture is done by timer_A3 hardware, not by software.
@@ -133,7 +133,7 @@
  * - Timer_A3 CCR0 is used for baud-rate generation. Based on the 
  *   required baud rate, an interval Bitime is calculated. 
  *
- * - Bitime is the lenght in timer_A3 counts between individual bits and
+ * - Bitime is the length in timer_A3 counts between individual bits and
  *   the interval at which timer_A3 latch receives in and transmits out
  *   data bits. 
  *
@@ -157,30 +157,22 @@
  *   error of rounding Bitime to the nearest integer is less than 0.03% 
  *   per bit.
  *------------------------------------------------------------------------
- * History:	
- * TODO:	Everything!
- *========================================================================
  */
 
 
-/*===========================================================================*/
-/*===============================[ Includes ]================================*/
-/*===========================================================================*/
-//Take care of by including io.h and setting -mmcu=msp430x2012 
+//Taken care of by including io.h and setting -mmcu=msp430x2012 
 //in cflags. #include	<msp430g2231.h> 
 #include	<io.h> /* Input/Output */
 
 /** 
  * @brief P1.1, which is BIT1 and is set to 0x0002 in msp430G2231.h
- * @brief This is the UART Transmit address. 
+ *        This is the UART Transmit address. 
  */ 
 #define	UART_TXD BIT1 
 
+
 void init_uart (void);
 
-/*===========================================================================*/
-/*==================================[ main ]=================================*/
-/*===========================================================================*/
 int main (void)
 { 
 	//WDTCTL = WDTPW + WDTHOLD; // Stop watchdog timer. 
