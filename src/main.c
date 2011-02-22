@@ -160,30 +160,145 @@
  */
 
 
-//Taken care of by including io.h and setting -mmcu=msp430x2012 
-//in cflags. #include	<msp430g2231.h> 
-#include	<io.h> /* Input/Output */
+/*
+ * No need to include msp430g2231.h b/c it's taken care of by in io.h and
+ * by setting -mmcu=msp430x2012 in cflags.
+ */
+#include	<io.h>  	 /* Input/Output */
+#include	<signal.h> /* MSPGCC ISR */
 
 /** 
- * @brief P1.1, which is BIT1 and is set to 0x0002 in msp430G2231.h
- *        This is the UART Transmit address. 
+ * @brief UART transmit and receive pin addresses. See msp430G2231.h.
+ *       
  */ 
-#define	UART_TXD BIT1 
+#define	UART_TXD (0x0002) // BIT1 P1.1 (TXD)
+#define	UART_RXD (0x0004) // BIT2 P1.2 (RXD)
 
+/**
+ * @brief LED1 and LED2 pin addresses. 
+ */
+#define	LED1 	   (0x0001) // BIT0 P1.0 
+#define	LED2 	   (0x0040) // BIT6 P1.6
 
-void init_uart (void);
+/**
+ * @brief Initialize LED1 and LED2. 
+ */
+void init_LEDs   (void);
+
+/**
+ * @brief Initialize TimerA for capture/compare interrupts.
+ */
+void init_timerA (void);
+
+/**
+ * @brief Initialize Port 1 for UART TXD and RXD.
+ */
+void init_uart   (void);
+
+/**
+ * @brief Initialize the clock frequency. 
+ */
+void init_clock (void);
+
+unsigned int timerCount = 0;
 
 int main (void)
 { 
-	//WDTCTL = WDTPW + WDTHOLD; // Stop watchdog timer. 
-	P1DIR |= 0x01;              // Set P1.0 to output direction. 
+  /*
+	 * Stop watchdog timer.  
+	 * According to the datasheet the watchdog timer starts
+	 * automatically after powerup. It must be configured or
+	 * halted at the beginning of code execution to avoid a 
+	 * system reset. Furthermore, the watchdog timer register
+	 * (WDTCTL) is password protected, and requires the upper 
+	 * byte durring write operations to be 0x5A, which is the
+	 * value associated with WDTPW.
+	 */
+	WDTCTL = WDTPW + WDTHOLD;
+
+ // Initialize LEDs and Timer
+	init_LEDs ();
+	init_clock ();
+	init_timerA ();
+
+	//Enable global interrupts, specific to the mspgcc compiler. 
+	eint ();
 
 	return 0;
 } /* end main () */
 
 
+//=============================================================================
+/**
+ * @brief Initialize LED1 (P1.0) and LED2 (P1.6).
+ */
+//=============================================================================
+void init_LEDs (void)
+{
+	// Set for output.
+	P1DIR |= (BIT0 + BIT6); 
+	P1OUT |= (BIT0 + BIT6);
+} /* end init_LED1 */
+
+
+//=============================================================================
+/**
+ * @brief Initialize TimerA for capture/compare interrupts.
+ */
+//=============================================================================
+void init_timerA (void)
+{ 
+ 	// Enable TimerA capture/compare interrupts. 
+	TACCTL0 = CCIE;       
+
+	// Value TACCR0 counts up to b/f interrupt. 
+	TACCR0 = 20000; 
+	
+	// Set timerA to submain clock, and run on continuous mode.  
+	TACTL = TASSEL_2 + MC_2;
+} /* end init_timerA */
+
+
+
+//=============================================================================
+/**
+ * @brief Initialize the clock frequency. 
+ */
+//=============================================================================
+void init_clock (void)
+{
+	// Set clock to 1mHz, and SMCLK to 125kHz.
+	BCSCTL1 = CALBC1_1MHZ;
+	DCOCTL  = CALDCO_1MHZ;
+	BCSCTL2 &= ~(DIVS_3);   // SMCLK is DCO/8
+} /* end init_clock */
+
+
+
+//=============================================================================
+/**
+ * @brief Initialize P1 for UART TXD and RXD. 
+ */
+//=============================================================================
 void init_uart (void)
 {
+	// Select TXD and RXD pins. 
+	P1SEL |= UART_TXD + UART_RXD; 
 
+	// Set P1.1 (TXD) to output direction.  
+	P1DIR |= UART_TXD; 
 } /* end init_uart () */
+
+
+
+//=============================================================================
+/**
+ * @brief ISR for TimerA interrupts. 
+ */
+//=============================================================================
+interrupt (TIMERA0_VECTOR) IntServiceRoutine (void)
+{
+	P1OUT ^= (BIT0 + BIT6); // Toggle LEDs.
+	CCR0 += 20000;          // add offset to CCR0.
+} /* end Timer_A */
 
