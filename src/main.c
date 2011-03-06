@@ -181,6 +181,11 @@
 #define	LED2 	   (0x0040) // BIT6 P1.6
 
 /**
+ * @brief Conditions for 9600 baud software UART, SMCLK = 1MHz
+ */
+#define	Bitime 13 // 1,000,000 / 8 / 9600 = ~13
+ 
+ /**
  * @brief Initialize LED1 and LED2. 
  */
 void init_LEDs   (void);
@@ -216,13 +221,16 @@ int main (void)
 	 */
 	WDTCTL = WDTPW + WDTHOLD;
 
- // Initialize LEDs and Timer
-	init_LEDs ();
-	init_clock ();
+ 	// Initialize LEDs, Clock, and Timer. 
+	init_LEDs   ();
+	init_clock  ();
 	init_timerA ();
+	init_uart   ();
 
 	//Enable global interrupts, specific to the mspgcc compiler. 
 	eint ();
+
+	while (1);
 
 	return 0;
 } /* end main () */
@@ -235,8 +243,14 @@ int main (void)
 //=============================================================================
 void init_LEDs (void)
 {
+
 	// Set for output.
 	P1DIR |= (BIT0 + BIT6); 
+
+	// Initialize all IO.
+	POUT = 0x00;
+
+	// Setup LED for output.
 	P1OUT |= (BIT0 + BIT6);
 } /* end init_LED1 */
 
@@ -244,17 +258,18 @@ void init_LEDs (void)
 //=============================================================================
 /**
  * @brief Initialize TimerA for capture/compare interrupts.
- */
+ */ 
 //=============================================================================
 void init_timerA (void)
 { 
- 	// Enable TimerA capture/compare interrupts. 
-	TACCTL0 = CCIE;       
+	// TXD Idle as Mark. 
+	TACCTL0 = OUT; // 0x0004 - output mode. 
 
-	// Value TACCR0 counts up to b/f interrupt. 
-	TACCR0 = 20000; 
-	
+	// Sync, Negative Edge, Capture, Interrupt. 
+	TACCTL1 = SCS + CM1 + CCIE; 
+
 	// Set timerA to submain clock, and run on continuous mode.  
+	// Continuous means count up to FFFF, rolls over to 0000, back up to FFFF, etc.
 	TACTL = TASSEL_2 + MC_2;
 } /* end init_timerA */
 
@@ -267,10 +282,11 @@ void init_timerA (void)
 //=============================================================================
 void init_clock (void)
 {
-	// Set clock to 1mHz, and SMCLK to 125kHz.
+	DCOCTL = 0x00;
+
+	// Set clock to 1mHz
 	BCSCTL1 = CALBC1_1MHZ;
 	DCOCTL  = CALDCO_1MHZ;
-	BCSCTL2 &= ~(DIVS_3);   // SMCLK is DCO/8
 } /* end init_clock */
 
 
@@ -296,9 +312,35 @@ void init_uart (void)
  * @brief ISR for TimerA interrupts. 
  */
 //=============================================================================
-interrupt (TIMERA0_VECTOR) IntServiceRoutine (void)
+interrupt (TIMERA0_VECTOR) TA0_IntServiceRoutine (void)
 {
+	int i;
 	P1OUT ^= (BIT0 + BIT6); // Toggle LEDs.
-	CCR0 += 20000;          // add offset to CCR0.
-} /* end Timer_A */
+	
+	for (i = 0;i<32000;i++);
 
+	P1OUT ^= (BIT0 + BIT6); // Toggle LEDs.
+
+	for (i = 0;i<32000;i++); 
+	P1OUT ^= (BIT0 + BIT6); // Toggle LEDs.
+} /* end IntServiceRoutine () */
+
+
+
+//=============================================================================
+/**
+ * @brief TimerA UART ISR for interrupts. 
+ */
+//=============================================================================
+interrupt (TIMERA1_VECTOR) TA1_IntServiceRoutine (void)
+{
+	int i;
+	P1OUT ^= (BIT0 + BIT6); // Toggle LEDs.
+	
+	for (i = 0;i<32000;i++);
+
+	P1OUT ^= (BIT0 + BIT6); // Toggle LEDs.
+
+	for (i = 0;i<32000;i++); 
+	P1OUT ^= (BIT0 + BIT6); // Toggle LEDs.
+} /* end IntServiceRoutine () */
