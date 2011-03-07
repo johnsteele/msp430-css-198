@@ -183,8 +183,9 @@
 /**
  * @brief Conditions for 9600 baud software UART, SMCLK = 1MHz
  */
-#define	Bitime 13 // 1,000,000 / 8 / 9600 = ~13
- 
+#define	BITIME 11 // 1,000,000 / 8 / 9600 = ~13
+#define	BYTE_BITS 8 // Number of bits in a byte.
+
  /**
  * @brief Initialize LED1 and LED2. 
  */
@@ -205,7 +206,30 @@ void init_uart   (void);
  */
 void init_clock (void);
 
-unsigned int timerCount = 0;
+/**
+ * @brief Transmits one  using UART. 
+ */
+void TimerA_UART_tx_byte (int number);
+
+/**
+ * @brief Number of transmitted bits. 
+ */
+unsigned int tx_bit_count = 0;
+
+/**
+ * @brief Number of receieved bits. 
+ */
+unsigned int rx_bit_count = 0;
+
+/**
+ * @brief Value to be transmitted.
+ */
+unsigned int tx_data;
+
+/**
+ * @brief Value received. 
+ */
+unsigned int rx_data;
 
 int main (void)
 { 
@@ -229,8 +253,14 @@ int main (void)
 
 	//Enable global interrupts, specific to the mspgcc compiler. 
 	eint ();
+	
+	int tx_value = 0;
+	while (1) { 
+		if (tx_value == 100) tx_value = 0;
 
-	while (1);
+		TimerA_UART_tx_byte (tx_value);	
+		tx_value++;	
+	} /* end while () */
 
 	return 0;
 } /* end main () */
@@ -242,16 +272,12 @@ int main (void)
  */
 //=============================================================================
 void init_LEDs (void)
-{
-
+{ 
 	// Set for output.
 	P1DIR |= (BIT0 + BIT6); 
 
 	// Initialize all IO.
-	POUT = 0x00;
-
-	// Setup LED for output.
-	P1OUT |= (BIT0 + BIT6);
+	P1OUT = 0x00;
 } /* end init_LED1 */
 
 
@@ -262,13 +288,17 @@ void init_LEDs (void)
 //=============================================================================
 void init_timerA (void)
 { 
+	//----------------------------
+	TACCTL0 = CCIE;	// CCR0 interrupt enabled. 
+
+	//----- commented out sunday ------------
 	// TXD Idle as Mark. 
-	TACCTL0 = OUT; // 0x0004 - output mode. 
+	//TACCTL0 = OUT; // 0x0004 - output mode. 	
 
 	// Sync, Negative Edge, Capture, Interrupt. 
 	TACCTL1 = SCS + CM1 + CCIE; 
 
-	// Set timerA to submain clock, and run on continuous mode.  
+	// Set TimerA to submain clock, and run on continuous mode.  
 	// Continuous means count up to FFFF, rolls over to 0000, back up to FFFF, etc.
 	TACTL = TASSEL_2 + MC_2;
 } /* end init_timerA */
@@ -281,12 +311,12 @@ void init_timerA (void)
  */
 //=============================================================================
 void init_clock (void)
-{
+{ 
 	DCOCTL = 0x00;
 
 	// Set clock to 1mHz
 	BCSCTL1 = CALBC1_1MHZ;
-	DCOCTL  = CALDCO_1MHZ;
+	DCOCTL  = CALDCO_1MHZ; 
 } /* end init_clock */
 
 
@@ -309,38 +339,75 @@ void init_uart (void)
 
 //=============================================================================
 /**
- * @brief ISR for TimerA interrupts. 
+ * @brief Transmit ISR for TimerA.
  */
 //=============================================================================
 interrupt (TIMERA0_VECTOR) TA0_IntServiceRoutine (void)
-{
-	int i;
-	P1OUT ^= (BIT0 + BIT6); // Toggle LEDs.
-	
-	for (i = 0;i<32000;i++);
+{ 
+	// If all bits have been trasmitted, disable interrupts. 
+	if (tx_bit_count == 0)  
+		TACCTL0 &= ~CCIE;	
 
-	P1OUT ^= (BIT0 + BIT6); // Toggle LEDs.
+	else {
 
-	for (i = 0;i<32000;i++); 
-	P1OUT ^= (BIT0 + BIT6); // Toggle LEDs.
+		// Turn green LED on to signal sending a bit.
+		P1OUT ^= BIT6; 
+
+		// Add offset to CCRx
+		TACCR0 += BITIME; 
+		
+		if (tx_data & 0x01) 
+			TACCTL0 &= ~OUTMOD2;
+
+		else 
+			TACCTL0 |= OUTMOD2; 
+
+		// Move to next bit to transmit.
+		tx_data >>= 1;
+
+		// Decrement total number of bits to send. 
+		tx_bit_count--;
+
+	  // Turn green LED off to signal finished sending a bit.
+		P1OUT ^= BIT6; 
+	} // end else 
 } /* end IntServiceRoutine () */
 
 
 
-//=============================================================================
 /**
- * @brief TimerA UART ISR for interrupts. 
+ * @brief Transmits one byte using UART. 
  */
-//=============================================================================
-interrupt (TIMERA1_VECTOR) TA1_IntServiceRoutine (void)
+void TimerA_UART_tx_byte (int the_tx_data)
 {
-	int i;
-	P1OUT ^= (BIT0 + BIT6); // Toggle LEDs.
-	
-	for (i = 0;i<32000;i++);
+	// Ensure last byte got transmitted.
+	while (TACCTL0 & CCIE); // Spin wheels until interrupts are disabled.
 
-	P1OUT ^= (BIT0 + BIT6); // Toggle LEDs.
+	// Set number of bits to send.  
+	tx_bit_count = BYTE_BITS;	
 
-	for (i = 0;i<32000;i++); 
-	P1OUT ^= (BIT0 + BIT6); // Toggle LEDs.
-} /* end IntServiceRoutine () */
+	// Toggle red LED to signal sending a new byte.
+	P1OUT ^= BIT0; 
+
+	// Current state of TA counter. 
+	TACCR0 = TAR;	
+
+	// Time until first bit to transmit.
+	TACCR0 += BITIME;
+
+	// Set TXD on EQU0, Interrupt
+	TACCTL0 = OUTMOD0 + CCIE;
+
+	// Load global value to transmit. 
+	tx_data = the_tx_data;
+
+	// Add stop bit to the tx_data
+	tx_data |= 0x100;
+
+	// Add a space for the start bit.
+	tx_data <<= 1;
+
+	// Toggle red LED to signal finished sending byte.
+	P1OUT ^= BIT0; 
+} /* end TimerA_UART_tx () */
+
