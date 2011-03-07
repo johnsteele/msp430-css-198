@@ -183,8 +183,9 @@
 /**
  * @brief Conditions for 9600 baud software UART, SMCLK = 1MHz
  */
-#define	BITIME 11 // 1,000,000 / 8 / 9600 = ~13
-#define	BYTE_BITS 8 // Number of bits in a byte.
+#define	BITIME 13 				// 1,000,000 / 8 / 9600 = ~13
+//#define	BIT_COUNT 0xA 	// Number of bits, 8 data + ST / SP.  
+#define	BIT_COUNT 0xB 	  // see msp430g2xx1_ta_uart9600.c
 
  /**
  * @brief Initialize LED1 and LED2. 
@@ -253,12 +254,13 @@ int main (void)
 
 	//Enable global interrupts, specific to the mspgcc compiler. 
 	eint ();
-	
-	int tx_value = 0;
+
+	unsigned int tx_value = 0;
 	while (1) { 
 		if (tx_value == 100) tx_value = 0;
 
 		TimerA_UART_tx_byte (tx_value);	
+
 		tx_value++;	
 	} /* end while () */
 
@@ -288,12 +290,7 @@ void init_LEDs (void)
 //=============================================================================
 void init_timerA (void)
 { 
-	//----------------------------
-	TACCTL0 = CCIE;	// CCR0 interrupt enabled. 
-
-	//----- commented out sunday ------------
-	// TXD Idle as Mark. 
-	//TACCTL0 = OUT; // 0x0004 - output mode. 	
+	TACCTL0 = OUT;
 
 	// Sync, Negative Edge, Capture, Interrupt. 
 	TACCTL1 = SCS + CM1 + CCIE; 
@@ -352,15 +349,18 @@ interrupt (TIMERA0_VECTOR) TA0_IntServiceRoutine (void)
 
 		// Turn green LED on to signal sending a bit.
 		P1OUT ^= BIT6; 
+	
+		int i;
+		for (i = 0;i < 32000;i++);
 
 		// Add offset to CCRx
 		TACCR0 += BITIME; 
 		
 		if (tx_data & 0x01) 
-			TACCTL0 &= ~OUTMOD2;
+			TACCTL0 &= ~OUTMOD2; 	// TX Mark '1'
 
 		else 
-			TACCTL0 |= OUTMOD2; 
+			TACCTL0 |= OUTMOD2;  	// TX Space '0'
 
 		// Move to next bit to transmit.
 		tx_data >>= 1;
@@ -371,6 +371,9 @@ interrupt (TIMERA0_VECTOR) TA0_IntServiceRoutine (void)
 	  // Turn green LED off to signal finished sending a bit.
 		P1OUT ^= BIT6; 
 	} // end else 
+	
+	int i;
+	for (i = 0;i < 32000;i++);
 } /* end IntServiceRoutine () */
 
 
@@ -381,19 +384,16 @@ interrupt (TIMERA0_VECTOR) TA0_IntServiceRoutine (void)
 void TimerA_UART_tx_byte (int the_tx_data)
 {
 	// Ensure last byte got transmitted.
-	while (TACCTL0 & CCIE); // Spin wheels until interrupts are disabled.
+	//while (TACCTL0 & CCIE); // Spin wheels until interrupts are disabled.
 
 	// Set number of bits to send.  
-	tx_bit_count = BYTE_BITS;	
+	tx_bit_count = BIT_COUNT;	
 
 	// Toggle red LED to signal sending a new byte.
 	P1OUT ^= BIT0; 
 
 	// Current state of TA counter. 
 	TACCR0 = TAR;	
-
-	// Time until first bit to transmit.
-	TACCR0 += BITIME;
 
 	// Set TXD on EQU0, Interrupt
 	TACCTL0 = OUTMOD0 + CCIE;
@@ -406,6 +406,9 @@ void TimerA_UART_tx_byte (int the_tx_data)
 
 	// Add a space for the start bit.
 	tx_data <<= 1;
+
+	// Time until first bit to transmit.
+	TACCR0 += BITIME;
 
 	// Toggle red LED to signal finished sending byte.
 	P1OUT ^= BIT0; 
