@@ -4,14 +4,14 @@ CC=msp430-gcc
 # it makes binary files rather big, but the actual downloadable code is not affected. 
 CFLAGS= -O2 -Os -Wall -g -mmcu=msp430x2012
 
-OBJS=main.o
+OBJS=msp430g2xx1_ta_uart9600.o
 
 all: $(OBJS)
-	$(CC) $(CFLAGS) -o main.elf $(OBJS)
+	$(CC) $(CFLAGS) -o msp430g2xx1_ta_uart9600.elf $(OBJS)
 
 %.o:%.c
 	$(CC) $(CFLAGS) -c $<
 
 clean:
-	rm -fr main.elf $(OBJS) 
+	rm -fr msp430g2xx1_ta_uart9600.elf $(OBJS) 
 

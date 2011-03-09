@@ -15,8 +15,14 @@
 #include	<stdio.h> 		/* printf */ 
 #include	<unistd.h>    /* STDIN_FILENO */
 
-static const char uart_device_name [] = "../../../../../../../dev/launchpad";
+static const char uart_device_name [] = "../../../../../../../dev/ttyACM0";
 
+/**
+ * @brief Used to remember original terminal attributes.
+ */
+struct termios saved_attributes;
+
+void set_input_mode (void);
 int main (void)
 {
 	/*
@@ -36,13 +42,15 @@ int main (void)
 	if (!isatty(fd)) 
 		printf ("%s %s \n", "Device not a serial (tty) device - ", uart_device_name);	
 
+
 	/*
 	 * Input flags - Turn off input processing. 
 	 * convert break into null byte, no CR to NL translation,
 	 * no input parity check, don't strip high bit off,
 	 * no XON/XOFF software flow control.
 	 */
-	struct termios config;
+
+  struct termios config;
 	config.c_iflag &= ~(IGNBRK | BRKINT | ICRNL |
 											INLCR  | PARMRK | INPCK | ISTRIP | IXON);
 
@@ -59,14 +67,19 @@ int main (void)
 	 */
 	config.c_lflag &= ~(ECHO | ECHONL | ICANON | IEXTEN | ISIG);
 
-	/*
+	//------------------------------------------------
+	/* Set character size
+	 *
 	 * Turn off character processing
 	 * clear current char size mask, no parity checking,
 	 * no output processing, force 8 bit input.
 	 */
-	config.c_cflag &= ~(CSIZE | PARENB);
-	config.c_cflag |= CS8;
+	config.c_cflag &= ~(CSIZE | PARENB); // Mask the character size bits. 
+	config.c_cflag |= CS8; // Select 8 data bits.
 
+
+
+	//------------------------------------------------
 	/*
 	 * One input byte is enough to return from read ()
 	 * Inter-character timer off.
@@ -89,18 +102,22 @@ int main (void)
 	 */
 	if (tcsetattr (fd, TCSAFLUSH, &config) < 0) {
 		// error handling recommended.
-		printf ("Unable to set configuratino.\n");
+		printf ("Unable to set configuration.\n");
 		return -1;
 	}
 
+//	unsigned char c = 'D';
 	unsigned char c = 'D';
 
-	while (c != 'q') {
+	while (c != 101) {
 	
 		// If new data is available on the serial port, print it out.	
-		if (read (fd, &c, 1) > 0)  printf ("%s %c \n", "Data: ", c);
+		if (read (fd, &c, 1) > 0) {
+			printf ("%s %c \n", "Data: ", c);
+		}
+		
 
-		else printf ("No data available...\n");
+//		else printf ("No data available...\n");
 			//write (STDOUT_FILENO, &c, 1);
 
 		// If new data is available on the console, send it to the serial port.
@@ -114,3 +131,8 @@ int main (void)
 	return 0;
 } /* end main () */
 
+
+void set_input_mode (void)
+{
+	
+} /* end set_input_mode () */

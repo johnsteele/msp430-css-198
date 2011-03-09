@@ -12,7 +12,7 @@
  *
  * UART Description
  * 
- * - The UART function uses hardware features of the timer_A3, and 
+ * - The UART function uses hardware features of the timer_A, and 
  *   software.
  *
  * - The implementation is half-duplex, event-driven, and it supports 8N1
@@ -21,13 +21,13 @@
  * - The character protocal used is 8N1: 
  * 	 8 data bits, no parity, and one stop bit.
  *
- * - timer_A3 provides automatic start-bit detection, baud-rate generation,
+ * - timer_A provides automatic start-bit detection, baud-rate generation,
  * 	 and data-bit latching. 
  *
- * - Hardware features of the timer_A3 greatly reduce software and CPU 
+ * - Hardware features of the timer_A greatly reduce software and CPU 
  *   overhead typically associated with mcu software UART implementations.
  *
- * - timer_A3 also allows the UART to operate as a background function
+ * - timer_A also allows the UART to operate as a background function
  *   simultaneously with other real-time system tasks.
  *
  * - The UART function uses a capture-compare register 0 (CCR0), one of 
@@ -38,18 +38,18 @@
  *   other tasks. The selection of CCR0 is arbitrary. Any or all CCRx 
  *   registers can be used for the UART function. 
  *
- * - Port pins P1.1 and P2.2 are peripheral-option selections as 
- *   associated with timer_A3 CCR0 (on MSP430x11x(1) derivitives).
+ * - Port pins P1.1 (TXD) and P1.2 (RXD) are peripheral-option selections as 
+ *   associated with timer_A CCR0.
  *
  * - P1.1 is selected for transmit, P2.2 for receive.
  *
  * - Peripheral-options are selected for a pin using the peripheral-option
- *   select registers. P1SEL and P2SEL. Because P1.1 is used as an output
+ *   select registers, P1SEL. Because P1.1 is used as an output
  *   this pin must be configured as an output using the port-1 direction
  *   register (P1DIR). 
  *
- * - P2.2 is required to operate as an input. This is the default for an 
- *   MSP430 port pin. Timer_A3 is configured to run in continuous mode,
+ * - P1.2 is required to operate as an input. This is the default for an 
+ *   MSP430 port pin. Timer_A is configured to run in continuous mode,
  *   allowing timer resources to be available for other functions
  *   simultaneously with the UART. 
  *
@@ -62,14 +62,14 @@
  *
  * - In receive mode, the capture-compare control register 0 (CCTL0) is
  *   initially configured such that CCR0 captures on the falling edge of
- *   receiving pin P2.2. As the receive line idles high, a falling edge
+ *   receiving pin P1.2. As the receive line idles high, a falling edge
  *   indicates the beginning of the start-bit. When the UART function is 
  *   ready to receive data, no overhead is put on the CPU even though the 
  *   function is ready to receive a character at any time. CPU resources
- *   are only exercised after a  start-bit falling edge occurs on P2.2. 
+ *   are only exercised after a  start-bit falling edge occurs on P1.2. 
  *   A falling edge on P2.2 captures the current value of the free running
- *   timer_A3 counter register (TAR) in CCR0 independent of any other run-
- *   time activity. Capture is done by timer_A3 hardware, not by software.
+ *   timer_A counter register (TAR) in CCR0 independent of any other run-
+ *   time activity. Capture is done by timer_A hardware, not by software.
  *   
  * - An interrupt is also issued to the CPU. The latency of the interrupt
  *   is not of great concern as the exact time the falling edge triggered
@@ -80,9 +80,9 @@
  *   middle of the first data bit. A 1.5 bit offset is added to CCR0, 
  *   positioning the next compare to the middle of the first data bit.
  *
- * - Received data are hardware latched in timer_A3 synchronized capture-
+ * - Received data are hardware latched in timer_A synchronized capture-
  *   compare input (SCCI). SCCI is a readable latch in CCTL0. In the UART
- *   function, SCCI captures the logic level on the input P2.2 synchronou-
+ *   function, SCCI captures the logic level on the input P1.2 synchronou-
  *   sly with the CCR0 compare. The UART function receives latched data 
  *   from SCCI. Software does not test P2.2 directly. 
  *
@@ -104,7 +104,7 @@
  *   configured to RESET mode (logical 0), or a SET mode (logical 1) to 
  *   occur on the next compare in CR0. When compare occurs, at the 
  *   beginning of a transmitted data bit, CCR0 hardware automatically 
- *   outputs the preconfigured data bit to P1.1  and an interrupt is 
+ *   outputs the preconfigured data bit to P1.1 and an interrupt is 
  *   issued. 
  *
  * - With CCR0 hardware automatically outputting data pits on P1.1,
@@ -127,25 +127,24 @@
  *   into carry. The appropriate jump is made and CCTL0 output mode is
  *   prepared and a 1-bit length offset is added to CCR0. 
  *
- *
  * Baud Rate Calculation
  *
- * - Timer_A3 CCR0 is used for baud-rate generation. Based on the 
+ * - Timer_A CCR0 is used for baud-rate generation. Based on the 
  *   required baud rate, an interval Bitime is calculated. 
  *
- * - Bitime is the length in timer_A3 counts between individual bits and
- *   the interval at which timer_A3 latch receives in and transmits out
+ * - Bitime is the length in timer_A counts between individual bits and
+ *   the interval at which timer_A latch receives in and transmits out
  *   data bits. 
  *
- * - Bitime is calculated as the timer_A3 clock source divided by the 
+ * - Bitime is calculated as the timer_A clock source divided by the 
  *   baud-rate. 
  *
- * - Timer_A3 has several available clock sources and dividers (see the
+ * - Timer_A has several available clock sources and dividers (see the
  *   (device specific data sheet). Available clock sources for the 
- *   MSP430x11x(1) timer_A3 module included the auxiliary clock
+ *   MSP430x11x(1) timer_A module included the auxiliary clock
  *   (ACLK), subsystem clock (SMCLK) and two external clocks. 
  *
- * - Example: Consider a 9600-baud-rate with the timer_A3 clock source
+ * - Example: Consider a 9600-baud-rate with the timer_A clock source
  *   selected as the auxiliary ACLK, which is configured to be the same
  *   as a 3.579545-MHz XTAL. 
  *
@@ -255,7 +254,7 @@ int main (void)
 	//Enable global interrupts, specific to the mspgcc compiler. 
 	eint ();
 
-	unsigned int tx_value = 0;
+	unsigned int tx_value = 13;
 	while (1) { 
 		if (tx_value == 100) tx_value = 0;
 
@@ -293,7 +292,7 @@ void init_timerA (void)
 	TACCTL0 = OUT;
 
 	// Sync, Negative Edge, Capture, Interrupt. 
-	TACCTL1 = SCS + CM1 + CCIE; 
+	TACCTL1 = SCS + CM1; // + CCIE; 
 
 	// Set TimerA to submain clock, and run on continuous mode.  
 	// Continuous means count up to FFFF, rolls over to 0000, back up to FFFF, etc.
@@ -350,9 +349,6 @@ interrupt (TIMERA0_VECTOR) TA0_IntServiceRoutine (void)
 		// Turn green LED on to signal sending a bit.
 		P1OUT ^= BIT6; 
 	
-		int i;
-		for (i = 0;i < 32000;i++);
-
 		// Add offset to CCRx
 		TACCR0 += BITIME; 
 		
@@ -371,20 +367,19 @@ interrupt (TIMERA0_VECTOR) TA0_IntServiceRoutine (void)
 	  // Turn green LED off to signal finished sending a bit.
 		P1OUT ^= BIT6; 
 	} // end else 
-	
-	int i;
-	for (i = 0;i < 32000;i++);
 } /* end IntServiceRoutine () */
 
 
 
+//=============================================================================
 /**
  * @brief Transmits one byte using UART. 
  */
+//=============================================================================
 void TimerA_UART_tx_byte (int the_tx_data)
 {
 	// Ensure last byte got transmitted.
-	//while (TACCTL0 & CCIE); // Spin wheels until interrupts are disabled.
+	while (TACCTL0 & CCIE); // Spin wheels until interrupts are disabled.
 
 	// Set number of bits to send.  
 	tx_bit_count = BIT_COUNT;	
